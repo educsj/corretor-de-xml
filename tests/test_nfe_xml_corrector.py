@@ -156,6 +156,35 @@ def test_preserves_xml_markup_and_changes_only_requested_tags(tmp_path: Path) ->
     assert "<xProd>KAISER LT 473 ML 12 pack</xProd>" in output_text
 
 
+def test_corrects_large_invoice_with_300_items(tmp_path: Path) -> None:
+    input_file = tmp_path / "nota_300_itens.xml"
+    output_file = tmp_path / "nota_300_itens_corrigida.xml"
+    input_file.write_text(_large_nfe(item_count=300), encoding="utf-8")
+
+    result = correct_xml_file(
+        input_file,
+        output_file,
+        CorrectionOptions(fix_cean=True, fix_ceantrib=True, renumber_cprod=True),
+    )
+
+    assert result.changed_counts == {"cEAN": 300, "cEANTrib": 300, "cProd": 300}
+    assert result.found_counts == {"cEAN": 300, "cEANTrib": 300, "cProd": 300}
+
+    output_text = output_file.read_text(encoding="utf-8")
+    values = _values_by_tag(output_file)
+
+    assert "ns0:" not in output_text
+    assert '<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">' in output_text
+    assert len(values["cProd"]) == 300
+    assert values["cProd"][:3] == ["0001", "0002", "0003"]
+    assert values["cProd"][99] == "0100"
+    assert values["cProd"][-1] == "0300"
+    assert values["cEAN"] == ["SEM GTIN"] * 300
+    assert values["cEANTrib"] == ["SEM GTIN"] * 300
+    assert "<xProd>Produto 300 com descricao preservada</xProd>" in output_text
+    assert "<qCom>300.0000</qCom>" in output_text
+
+
 def test_requires_at_least_one_correction(tmp_path: Path) -> None:
     input_file = tmp_path / "nota.xml"
     output_file = tmp_path / "nota_corrigida.xml"
@@ -186,3 +215,39 @@ def _local_name(tag: str) -> str:
     if tag.startswith("{"):
         return tag.rsplit("}", 1)[1]
     return tag
+
+
+def _large_nfe(item_count: int) -> str:
+    items = []
+    for index in range(1, item_count + 1):
+        items.append(
+            f"""      <det nItem="{index}">
+        <prod>
+          <cProd>FORN-{index:04d}#X</cProd>
+          <cEAN>7891000{index:06d}</cEAN>
+          <xProd>Produto {index} com descricao preservada</xProd>
+          <NCM>22030000</NCM>
+          <CFOP>1949</CFOP>
+          <uCom>UN</uCom>
+          <qCom>{index}.0000</qCom>
+          <vUnCom>2.9600000000</vUnCom>
+          <vProd>{index * 2.96:.2f}</vProd>
+          <cEANTrib>7892000{index:06d}</cEANTrib>
+          <uTrib>UN</uTrib>
+          <qTrib>{index}.0000</qTrib>
+          <vUnTrib>2.9600000000</vUnTrib>
+          <indTot>1</indTot>
+        </prod>
+      </det>"""
+        )
+
+    joined_items = "\n".join(items)
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
+  <NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+    <infNFe versao="4.00" Id="NFeGrande300Itens">
+{joined_items}
+    </infNFe>
+  </NFe>
+</nfeProc>
+"""
