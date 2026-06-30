@@ -84,6 +84,21 @@ def test_renumber_cprod_uses_four_digits_in_item_order(tmp_path: Path) -> None:
     assert result.found_counts["cProd"] == 2
 
 
+def test_renumber_cprod_allows_custom_digit_count(tmp_path: Path) -> None:
+    input_file = tmp_path / "nota.xml"
+    output_file = tmp_path / "nota_corrigida.xml"
+    input_file.write_text(SAMPLE_NFE, encoding="utf-8")
+
+    correct_xml_file(
+        input_file,
+        output_file,
+        CorrectionOptions(renumber_cprod=True, cprod_digits=7),
+    )
+
+    values = _values_by_tag(output_file)
+    assert values["cProd"] == ["0000001", "0000002"]
+
+
 def test_combined_corrections(tmp_path: Path) -> None:
     input_file = tmp_path / "nota.xml"
     output_file = tmp_path / "nota_corrigida.xml"
