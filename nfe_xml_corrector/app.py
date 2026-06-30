@@ -185,8 +185,7 @@ class NFeXmlCorrectorApp:
 
         footer = ttk.Frame(main)
         footer.grid(row=6, column=0, sticky="ew", pady=(10, 0))
-        footer.columnconfigure(1, weight=1)
-        ttk.Label(footer, text="Creditos:").grid(row=0, column=0, sticky="w")
+        footer.columnconfigure(0, weight=1)
         github_link = tk.Label(
             footer,
             text="github.com/educsj",
@@ -195,7 +194,7 @@ class NFeXmlCorrectorApp:
             cursor="hand2",
             font=("Segoe UI", 10, "underline"),
         )
-        github_link.grid(row=0, column=1, sticky="w", padx=(5, 0))
+        github_link.grid(row=0, column=0, sticky="w")
         github_link.bind("<Button-1>", lambda _event: webbrowser.open_new_tab("https://github.com/educsj"))
 
         self._sync_cprod_digits_visibility()
