@@ -11,6 +11,7 @@ O programa foi criado para resolver dois problemas comuns:
 
 - Importa um arquivo `.xml` de NF-e.
 - Gera uma copia corrigida, sem alterar o XML original.
+- Preserva a estrutura, formatacao e namespaces do XML original.
 - Troca `<cEAN>` para `SEM GTIN`.
 - Opcionalmente troca `<cEANTrib>` para `SEM GTIN`.
 - Renumera `<cProd>` em sequencia: `0001`, `0002`, `0003`...
@@ -80,4 +81,3 @@ dist\CorretorXMLNFe.exe
 ## Autor
 
 Criado por [Eduardo Coutinho da Silva Junior](https://github.com/educsj).
-

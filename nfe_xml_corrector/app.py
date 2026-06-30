@@ -273,11 +273,18 @@ class NFeXmlCorrectorApp:
             result = correct_xml_file(input_file, output_file, options)
             self.last_output_path = result.output_path
             summary = self._format_result(result.changed_counts, result.found_counts)
+            opened_folder = self._try_open_folder(result.output_path.parent)
+            folder_message = (
+                "A pasta de destino foi aberta."
+                if opened_folder
+                else "O arquivo foi gerado, mas nao consegui abrir a pasta automaticamente."
+            )
             self._write_log(
                 "XML corrigido com sucesso.\n"
                 f"Saida: {result.output_path}\n\n"
                 f"{summary}\n\n"
-                "O arquivo original nao foi alterado."
+                "O arquivo original nao foi alterado.\n"
+                f"{folder_message}"
             )
             messagebox.showinfo("XML corrigido", "Arquivo corrigido gerado com sucesso.")
         except Exception as exc:  # noqa: BLE001 - GUI should show recoverable errors.
@@ -303,7 +310,14 @@ class NFeXmlCorrectorApp:
         if not folder or not folder.exists():
             messagebox.showwarning("Pasta nao encontrada", "Nenhum arquivo corrigido foi gerado ainda.")
             return
-        os.startfile(folder)  # type: ignore[attr-defined]
+        self._try_open_folder(folder)
+
+    def _try_open_folder(self, folder: Path) -> bool:
+        try:
+            os.startfile(str(folder))  # type: ignore[attr-defined]
+        except OSError:
+            return False
+        return True
 
     def _write_log(self, text: str) -> None:
         self.log.configure(state="normal")

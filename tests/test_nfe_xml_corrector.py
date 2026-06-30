@@ -31,6 +31,23 @@ SAMPLE_NFE = """<?xml version="1.0" encoding="UTF-8"?>
 </NFe>
 """
 
+SAMPLE_NFE_PROC = """<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
+  <NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+    <infNFe versao="4.00" Id="NFe123">
+      <det nItem="1">
+        <prod>
+          <cProd>139068</cProd>
+          <cEAN>7896045503414</cEAN>
+          <xProd>KAISER LT 473 ML 12 pack</xProd>
+          <cEANTrib>7896045503414</cEANTrib>
+        </prod>
+      </det>
+    </infNFe>
+  </NFe>
+</nfeProc>
+"""
+
 
 def test_fix_cean_keeps_ceantrib_when_not_selected(tmp_path: Path) -> None:
     input_file = tmp_path / "nota.xml"
@@ -113,6 +130,30 @@ def test_combined_corrections(tmp_path: Path) -> None:
     values = _values_by_tag(output_file)
     assert values["cEAN"] == ["SEM GTIN", "SEM GTIN"]
     assert values["cProd"] == ["0001", "0002"]
+
+
+def test_preserves_xml_markup_and_changes_only_requested_tags(tmp_path: Path) -> None:
+    input_file = tmp_path / "nota.xml"
+    output_file = tmp_path / "nota_corrigida.xml"
+    input_file.write_text(SAMPLE_NFE_PROC, encoding="utf-8")
+
+    correct_xml_file(
+        input_file,
+        output_file,
+        CorrectionOptions(fix_cean=True, fix_ceantrib=True, renumber_cprod=True),
+    )
+
+    expected = (
+        SAMPLE_NFE_PROC
+        .replace("<cProd>139068</cProd>", "<cProd>0001</cProd>")
+        .replace("<cEAN>7896045503414</cEAN>", "<cEAN>SEM GTIN</cEAN>")
+        .replace("<cEANTrib>7896045503414</cEANTrib>", "<cEANTrib>SEM GTIN</cEANTrib>")
+    )
+    output_text = output_file.read_text(encoding="utf-8")
+    assert output_text == expected
+    assert "ns0:" not in output_text
+    assert '<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">' in output_text
+    assert "<xProd>KAISER LT 473 ML 12 pack</xProd>" in output_text
 
 
 def test_requires_at_least_one_correction(tmp_path: Path) -> None:
