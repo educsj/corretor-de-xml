@@ -15,6 +15,7 @@ O programa foi criado para resolver dois problemas comuns:
 - Troca `<cEAN>` para `SEM GTIN`.
 - Opcionalmente troca `<cEANTrib>` para `SEM GTIN`.
 - Renumera `<cProd>` em sequencia: `0001`, `0002`, `0003`...
+- Gera numeros aleatorios unicos para `<cProd>`, com no minimo 4 digitos.
 - Permite alterar a quantidade de digitos do `<cProd>`.
 - Interface grafica simples para Windows.
 

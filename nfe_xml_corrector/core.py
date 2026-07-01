@@ -3,10 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
+import secrets
 
 
 SEM_GTIN = "SEM GTIN"
 DEFAULT_CPROD_DIGITS = 4
+MIN_RANDOM_CPROD_DIGITS = 4
 
 
 @dataclass(frozen=True)
@@ -14,6 +16,7 @@ class CorrectionOptions:
     fix_cean: bool = False
     fix_ceantrib: bool = False
     renumber_cprod: bool = False
+    randomize_cprod: bool = False
     cprod_digits: int = DEFAULT_CPROD_DIGITS
     sem_gtin_text: str = SEM_GTIN
 
@@ -59,8 +62,15 @@ def correct_xml_file(
         raise ValueError(f"O caminho de entrada nao e um arquivo: {input_file}")
     if not _has_any_option(options):
         raise ValueError("Selecione ao menos uma correcao antes de gerar o XML.")
-    if options.cprod_digits < 1:
+    if options.renumber_cprod and options.randomize_cprod:
+        raise ValueError("Escolha apenas um modo de correcao para o cProd.")
+    if options.renumber_cprod and options.cprod_digits < 1:
         raise ValueError("A quantidade de digitos do cProd deve ser maior que zero.")
+    if options.randomize_cprod and options.cprod_digits < MIN_RANDOM_CPROD_DIGITS:
+        raise ValueError(
+            f"Os codigos aleatorios do cProd devem ter ao menos "
+            f"{MIN_RANDOM_CPROD_DIGITS} digitos."
+        )
 
     original_bytes = input_file.read_bytes()
     encoding = _detect_xml_encoding(original_bytes)
@@ -95,6 +105,14 @@ def correct_xml_file(
         )
         changed_counts["cProd"] = changed
         found_counts["cProd"] = found
+    elif options.randomize_cprod:
+        xml_text, changed, found = _renumber_tag_randomly(
+            xml_text,
+            "cProd",
+            options.cprod_digits,
+        )
+        changed_counts["cProd"] = changed
+        found_counts["cProd"] = found
 
     output_file.parent.mkdir(parents=True, exist_ok=True)
     output_file.write_bytes(xml_text.encode(encoding))
@@ -108,7 +126,12 @@ def correct_xml_file(
 
 
 def _has_any_option(options: CorrectionOptions) -> bool:
-    return options.fix_cean or options.fix_ceantrib or options.renumber_cprod
+    return (
+        options.fix_cean
+        or options.fix_ceantrib
+        or options.renumber_cprod
+        or options.randomize_cprod
+    )
 
 
 def _detect_xml_encoding(data: bytes) -> str:
@@ -158,6 +181,45 @@ def _renumber_tag_sequentially(xml_text: str, tag_name: str, digits: int) -> tup
         return f"{match.group('open')}{new_value}{match.group('close')}"
 
     return pattern.sub(replace, xml_text), changed, found
+
+
+def _renumber_tag_randomly(xml_text: str, tag_name: str, digits: int) -> tuple[str, int, int]:
+    pattern = _tag_pattern(tag_name)
+    matches = list(pattern.finditer(xml_text))
+    found = len(matches)
+    if not found:
+        return xml_text, 0, 0
+
+    lower_bound = 10 ** (digits - 1)
+    capacity = 9 * lower_bound
+    original_values = {match.group("value") for match in matches}
+    reserved_values = {
+        int(value)
+        for value in original_values
+        if len(value) == digits and value.isdigit() and int(value) >= lower_bound
+    }
+    if found > capacity - len(reserved_values):
+        raise ValueError(
+            f"Nao ha codigos aleatorios de {digits} digitos suficientes "
+            f"para {found} itens."
+        )
+
+    generated_values: list[str] = []
+    used_values = set(reserved_values)
+    while len(generated_values) < found:
+        candidate = lower_bound + secrets.randbelow(capacity)
+        if candidate in used_values:
+            continue
+        used_values.add(candidate)
+        generated_values.append(str(candidate))
+
+    generated = iter(generated_values)
+
+    def replace(match: re.Match[str]) -> str:
+        new_value = next(generated)
+        return f"{match.group('open')}{new_value}{match.group('close')}"
+
+    return pattern.sub(replace, xml_text), found, found
 
 
 def _tag_pattern(tag_name: str) -> re.Pattern[str]:

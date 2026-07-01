@@ -116,6 +116,47 @@ def test_renumber_cprod_allows_custom_digit_count(tmp_path: Path) -> None:
     assert values["cProd"] == ["0000001", "0000002"]
 
 
+def test_randomize_cprod_generates_unique_four_digit_numbers(tmp_path: Path) -> None:
+    input_file = tmp_path / "nota.xml"
+    output_file = tmp_path / "nota_corrigida.xml"
+    input_file.write_text(SAMPLE_NFE, encoding="utf-8")
+
+    result = correct_xml_file(
+        input_file,
+        output_file,
+        CorrectionOptions(randomize_cprod=True),
+    )
+
+    values = _values_by_tag(output_file)
+    random_codes = values["cProd"]
+    assert len(random_codes) == 2
+    assert len(set(random_codes)) == 2
+    assert all(code.isdigit() and len(code) == 4 for code in random_codes)
+    assert all(1000 <= int(code) <= 9999 for code in random_codes)
+    assert not set(random_codes) & {"ABC#1", "XYZ/2"}
+    assert result.changed_counts["cProd"] == 2
+    assert result.found_counts["cProd"] == 2
+
+
+def test_randomize_cprod_allows_more_digits_and_avoids_original_values(tmp_path: Path) -> None:
+    input_file = tmp_path / "nota.xml"
+    output_file = tmp_path / "nota_corrigida.xml"
+    input_file.write_text(
+        SAMPLE_NFE.replace("ABC#1", "123456").replace("XYZ/2", "654321"),
+        encoding="utf-8",
+    )
+
+    correct_xml_file(
+        input_file,
+        output_file,
+        CorrectionOptions(randomize_cprod=True, cprod_digits=6),
+    )
+
+    random_codes = _values_by_tag(output_file)["cProd"]
+    assert all(code.isdigit() and len(code) == 6 for code in random_codes)
+    assert not set(random_codes) & {"123456", "654321"}
+
+
 def test_combined_corrections(tmp_path: Path) -> None:
     input_file = tmp_path / "nota.xml"
     output_file = tmp_path / "nota_corrigida.xml"
@@ -183,6 +224,55 @@ def test_corrects_large_invoice_with_300_items(tmp_path: Path) -> None:
     assert values["cEANTrib"] == ["SEM GTIN"] * 300
     assert "<xProd>Produto 300 com descricao preservada</xProd>" in output_text
     assert "<qCom>300.0000</qCom>" in output_text
+
+
+def test_randomizes_cprod_in_large_invoice_with_300_items(tmp_path: Path) -> None:
+    input_file = tmp_path / "nota_300_itens.xml"
+    output_file = tmp_path / "nota_300_itens_corrigida.xml"
+    input_file.write_text(_large_nfe(item_count=300), encoding="utf-8")
+
+    result = correct_xml_file(
+        input_file,
+        output_file,
+        CorrectionOptions(randomize_cprod=True, cprod_digits=6),
+    )
+
+    output_text = output_file.read_text(encoding="utf-8")
+    random_codes = _values_by_tag(output_file)["cProd"]
+    assert result.changed_counts["cProd"] == 300
+    assert result.found_counts["cProd"] == 300
+    assert len(random_codes) == 300
+    assert len(set(random_codes)) == 300
+    assert all(code.isdigit() and len(code) == 6 for code in random_codes)
+    assert "ns0:" not in output_text
+    assert "<xProd>Produto 300 com descricao preservada</xProd>" in output_text
+    assert "<qCom>300.0000</qCom>" in output_text
+
+
+def test_random_cprod_requires_at_least_four_digits(tmp_path: Path) -> None:
+    input_file = tmp_path / "nota.xml"
+    output_file = tmp_path / "nota_corrigida.xml"
+    input_file.write_text(SAMPLE_NFE, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="ao menos 4 digitos"):
+        correct_xml_file(
+            input_file,
+            output_file,
+            CorrectionOptions(randomize_cprod=True, cprod_digits=3),
+        )
+
+
+def test_rejects_two_cprod_modes_at_the_same_time(tmp_path: Path) -> None:
+    input_file = tmp_path / "nota.xml"
+    output_file = tmp_path / "nota_corrigida.xml"
+    input_file.write_text(SAMPLE_NFE, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="apenas um modo"):
+        correct_xml_file(
+            input_file,
+            output_file,
+            CorrectionOptions(renumber_cprod=True, randomize_cprod=True),
+        )
 
 
 def test_requires_at_least_one_correction(tmp_path: Path) -> None:

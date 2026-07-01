@@ -14,21 +14,29 @@ from nfe_xml_corrector.core import (
 
 
 PRESET_CUSTOM = "Personalizado"
+CPROD_NONE = "none"
+CPROD_SEQUENTIAL = "sequential"
+CPROD_RANDOM = "random"
 PRESETS = {
     "EAN vincula produto errado": {
         "fix_cean": True,
         "fix_ceantrib": False,
-        "renumber_cprod": False,
+        "cprod_mode": CPROD_NONE,
     },
     "SequelizeUniqueConstraintError / cProd": {
         "fix_cean": False,
         "fix_ceantrib": False,
-        "renumber_cprod": True,
+        "cprod_mode": CPROD_SEQUENTIAL,
+    },
+    "cProd ja existe no cadastro": {
+        "fix_cean": False,
+        "fix_ceantrib": False,
+        "cprod_mode": CPROD_RANDOM,
     },
     "Corrigir EAN e cProd": {
         "fix_cean": True,
         "fix_ceantrib": False,
-        "renumber_cprod": True,
+        "cprod_mode": CPROD_SEQUENTIAL,
     },
     PRESET_CUSTOM: None,
 }
@@ -38,15 +46,15 @@ class NFeXmlCorrectorApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("Corretor de XML NF-e")
-        self.root.geometry("780x520")
-        self.root.minsize(720, 480)
+        self.root.geometry("780x680")
+        self.root.minsize(720, 650)
 
         self.input_path = tk.StringVar()
         self.output_path = tk.StringVar()
         self.preset = tk.StringVar(value="EAN vincula produto errado")
         self.fix_cean = tk.BooleanVar(value=True)
         self.fix_ceantrib = tk.BooleanVar(value=False)
-        self.renumber_cprod = tk.BooleanVar(value=False)
+        self.cprod_mode = tk.StringVar(value=CPROD_NONE)
         self.cprod_digits = tk.IntVar(value=4)
         self.last_output_path: Path | None = None
 
@@ -136,20 +144,32 @@ class NFeXmlCorrectorApp:
         ttk.Checkbutton(
             checks,
             text="Renumerar <cProd> em sequencia 0001, 0002...",
-            variable=self.renumber_cprod,
-            command=self._toggle_renumber_cprod,
+            variable=self.cprod_mode,
+            onvalue=CPROD_SEQUENTIAL,
+            offvalue=CPROD_NONE,
+            command=self._select_cprod_mode,
         ).grid(row=2, column=0, sticky="w", pady=3)
+        ttk.Checkbutton(
+            checks,
+            text="Gerar numeros aleatorios unicos para <cProd>",
+            variable=self.cprod_mode,
+            onvalue=CPROD_RANDOM,
+            offvalue=CPROD_NONE,
+            command=self._select_cprod_mode,
+        ).grid(row=3, column=0, sticky="w", pady=3)
 
         self.digits_frame = ttk.Frame(options_frame)
-        ttk.Label(self.digits_frame, text="Digitos do cProd").grid(row=0, column=0, sticky="w")
-        ttk.Spinbox(
+        self.digits_label = ttk.Label(self.digits_frame, text="Digitos do cProd")
+        self.digits_label.grid(row=0, column=0, sticky="w")
+        self.digits_spinbox = ttk.Spinbox(
             self.digits_frame,
             from_=1,
             to=20,
             textvariable=self.cprod_digits,
             width=6,
             command=self._mark_custom,
-        ).grid(row=0, column=1, sticky="w", padx=(8, 0))
+        )
+        self.digits_spinbox.grid(row=0, column=1, sticky="w", padx=(8, 0))
 
         actions = ttk.Frame(main)
         actions.grid(row=4, column=0, sticky="ew", pady=(16, 0))
@@ -206,19 +226,30 @@ class NFeXmlCorrectorApp:
             return
         self.fix_cean.set(preset["fix_cean"])
         self.fix_ceantrib.set(preset["fix_ceantrib"])
-        self.renumber_cprod.set(preset["renumber_cprod"])
+        self.cprod_mode.set(preset["cprod_mode"])
         self._sync_cprod_digits_visibility()
 
     def _mark_custom(self) -> None:
         if self.preset.get() != PRESET_CUSTOM:
             self.preset.set(PRESET_CUSTOM)
 
-    def _toggle_renumber_cprod(self) -> None:
+    def _select_cprod_mode(self) -> None:
         self._mark_custom()
         self._sync_cprod_digits_visibility()
 
     def _sync_cprod_digits_visibility(self) -> None:
-        if self.renumber_cprod.get():
+        mode = self.cprod_mode.get()
+        if mode != CPROD_NONE:
+            minimum = 4 if mode == CPROD_RANDOM else 1
+            self.digits_spinbox.configure(from_=minimum)
+            if self.cprod_digits.get() < minimum:
+                self.cprod_digits.set(minimum)
+            label = (
+                "Digitos do cProd (minimo 4)"
+                if mode == CPROD_RANDOM
+                else "Digitos do cProd"
+            )
+            self.digits_label.configure(text=label)
             self.digits_frame.grid(row=2, column=0, columnspan=2, sticky="w", pady=(8, 2))
         else:
             self.digits_frame.grid_remove()
@@ -266,7 +297,8 @@ class NFeXmlCorrectorApp:
             options = CorrectionOptions(
                 fix_cean=self.fix_cean.get(),
                 fix_ceantrib=self.fix_ceantrib.get(),
-                renumber_cprod=self.renumber_cprod.get(),
+                renumber_cprod=self.cprod_mode.get() == CPROD_SEQUENTIAL,
+                randomize_cprod=self.cprod_mode.get() == CPROD_RANDOM,
                 cprod_digits=int(self.cprod_digits.get()),
             )
 
