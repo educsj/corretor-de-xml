@@ -2,6 +2,15 @@
 
 Aplicativo Windows para corrigir XMLs de notas fiscais de entrada antes da importacao em sistemas ERP.
 
+## Versao web
+
+Acesse sem instalar:
+
+<https://educsj.github.io/corretor-de-xml/>
+
+O XML e processado inteiramente no navegador. Nenhum conteudo da nota e
+enviado para um servidor.
+
 O programa foi criado para resolver dois problemas comuns:
 
 - Fornecedores enviando `<cEAN>` com EAN/GTIN que ja existe em outro produto.
@@ -20,6 +29,7 @@ O programa foi criado para resolver dois problemas comuns:
 - Inclui um manual de uso dentro do proprio programa.
 - Interface grafica simples para Windows.
 - Pacote executavel para Linux x86_64.
+- Versao web responsiva, sem instalacao.
 
 ## Como usar
 
@@ -93,7 +103,16 @@ Depois rode:
 
 ```powershell
 python -m pytest tests/test_nfe_xml_corrector.py -q
+node --test web/tests/core.test.mjs
 ```
+
+## Rodar a versao web localmente
+
+```powershell
+python -m http.server 8000 --directory web
+```
+
+Abra <http://localhost:8000>.
 
 ## Gerar o executavel
 

@@ -69,6 +69,9 @@ jobs:
       - name: Run tests
         run: python -m pytest -q
 
+      - name: Run web tests
+        run: node --test web/tests/core.test.mjs
+
       - name: Build Linux package
         run: bash nfe_xml_corrector/build_linux.sh
 

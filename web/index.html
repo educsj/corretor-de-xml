@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
+    >
+    <meta
+      name="description"
+      content="Corrija cEAN, cEANTrib e cProd de XMLs de NF-e diretamente no navegador."
+    >
+    <meta name="theme-color" content="#146c5a">
+    <title>Corretor de XML NF-e</title>
+    <link rel="stylesheet" href="styles.css">
+    <script defer src="vendor/lucide.min.js"></script>
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="app-header__inner">
+        <div class="brand">
+          <span class="brand__mark" aria-hidden="true">
+            <i data-lucide="file-check-2"></i>
+          </span>
+          <span class="brand__text">
+            <strong>Corretor de XML NF-e</strong>
+            <small>Versão web</small>
+          </span>
+        </div>
+        <div class="header-actions">
+          <span class="privacy-badge">
+            <i data-lucide="shield-check" aria-hidden="true"></i>
+            <span>Processamento local</span>
+          </span>
+          <button
+            class="icon-button"
+            id="help-button"
+            type="button"
+            aria-label="Abrir manual de uso"
+            title="Abrir manual de uso"
+          >
+            <i data-lucide="circle-help" aria-hidden="true"></i>
+          </button>
+          <a
+            class="icon-button"
+            href="https://github.com/educsj/corretor-de-xml"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Abrir o projeto no GitHub"
+            title="Abrir o projeto no GitHub"
+          >
+            <i data-lucide="git-branch" aria-hidden="true"></i>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main class="page-shell">
+      <div class="page-intro">
+        <div>
+          <h1>Corrigir nota de entrada</h1>
+          <p>Selecione o XML, escolha o problema e baixe uma cópia corrigida.</p>
+        </div>
+        <span class="local-note">
+          <i data-lucide="lock-keyhole" aria-hidden="true"></i>
+          O arquivo não sai deste dispositivo
+        </span>
+      </div>
+
+      <div class="tool-shell">
+        <form class="workflow" id="correction-form" novalidate>
+          <section class="tool-section" aria-labelledby="file-heading">
+            <div class="section-heading">
+              <span class="step-number">1</span>
+              <div>
+                <h2 id="file-heading">Arquivo XML</h2>
+                <p>Use uma NF-e ou nfeProc no formato .xml.</p>
+              </div>
+            </div>
+
+            <label class="dropzone" id="dropzone" for="xml-file">
+              <input
+                id="xml-file"
+                data-testid="xml-file"
+                type="file"
+                accept=".xml,text/xml,application/xml"
+              >
+              <span class="dropzone__icon" aria-hidden="true">
+                <i data-lucide="upload"></i>
+              </span>
+              <span class="dropzone__title">Arraste o XML aqui</span>
+              <span class="dropzone__hint">ou clique para selecionar</span>
+            </label>
+
+            <div class="selected-file" id="selected-file" hidden>
+              <span class="selected-file__icon" aria-hidden="true">
+                <i data-lucide="file-text"></i>
+              </span>
+              <span class="selected-file__details">
+                <strong id="selected-file-name"></strong>
+                <small id="selected-file-size"></small>
+              </span>
+              <button
+                class="icon-button icon-button--subtle"
+                id="remove-file"
+                type="button"
+                aria-label="Remover arquivo selecionado"
+                title="Remover arquivo selecionado"
+              >
+                <i data-lucide="x" aria-hidden="true"></i>
+              </button>
+            </div>
+          </section>
+
+          <section class="tool-section" aria-labelledby="correction-heading">
+            <div class="section-heading">
+              <span class="step-number">2</span>
+              <div>
+                <h2 id="correction-heading">Correção</h2>
+                <p>Escolha o erro do ERP ou configure as opções manualmente.</p>
+              </div>
+            </div>
+
+            <label class="field-label" for="preset">Erro ou situação</label>
+            <div class="select-wrap">
+              <select id="preset">
+                <option value="ean">EAN vincula produto errado</option>
+                <option value="sequelize">SequelizeUniqueConstraintError / cProd</option>
+                <option value="existing-cprod">cProd já existe no cadastro</option>
+                <option value="both">Corrigir EAN e cProd</option>
+                <option value="custom">Personalizado</option>
+              </select>
+              <i data-lucide="chevron-down" aria-hidden="true"></i>
+            </div>
+
+            <fieldset class="option-group">
+              <legend>EAN / GTIN</legend>
+              <label class="check-option">
+                <input id="fix-cean" type="checkbox" checked>
+                <span>
+                  <strong>Trocar &lt;cEAN&gt; para SEM GTIN</strong>
+                  <small>Evita o vínculo pelo EAN enviado pelo fornecedor.</small>
+                </span>
+              </label>
+              <label class="check-option">
+                <input id="fix-ceantrib" type="checkbox">
+                <span>
+                  <strong>Trocar também &lt;cEANTrib&gt;</strong>
+                  <small>Use quando o ERP também validar o EAN tributável.</small>
+                </span>
+              </label>
+            </fieldset>
+
+            <fieldset class="option-group">
+              <legend>Tratamento do &lt;cProd&gt;</legend>
+              <div class="segmented" id="cprod-segmented">
+                <label>
+                  <input type="radio" name="cprod-mode" value="none" checked>
+                  <span>Não alterar</span>
+                </label>
+                <label>
+                  <input type="radio" name="cprod-mode" value="sequential">
+                  <span>Sequência</span>
+                </label>
+                <label>
+                  <input type="radio" name="cprod-mode" value="random">
+                  <span>Aleatórios</span>
+                </label>
+              </div>
+              <div class="digits-field" id="digits-field" hidden>
+                <label for="cprod-digits">Dígitos do cProd</label>
+                <input
+                  id="cprod-digits"
+                  type="number"
+                  inputmode="numeric"
+                  min="1"
+                  max="20"
+                  value="4"
+                >
+                <small id="digits-hint">Quantidade mínima de dígitos.</small>
+              </div>
+            </fieldset>
+          </section>
+
+          <section class="tool-section tool-section--action" aria-labelledby="action-heading">
+            <div class="section-heading">
+              <span class="step-number">3</span>
+              <div>
+                <h2 id="action-heading">Gerar cópia corrigida</h2>
+                <p>O XML original permanece intacto.</p>
+              </div>
+            </div>
+            <button class="primary-button" id="process-button" type="submit" disabled>
+              <i data-lucide="download" aria-hidden="true"></i>
+              <span>Corrigir e baixar XML</span>
+            </button>
+          </section>
+        </form>
+
+        <aside class="summary-panel" aria-labelledby="summary-heading">
+          <div class="summary-panel__header">
+            <h2 id="summary-heading">Resumo</h2>
+            <span id="summary-state">Aguardando arquivo</span>
+          </div>
+
+          <div class="summary-block">
+            <span class="summary-label">Arquivo</span>
+            <strong id="summary-file">Nenhum XML selecionado</strong>
+          </div>
+
+          <div class="summary-block">
+            <span class="summary-label">Alterações escolhidas</span>
+            <ul class="correction-summary" id="correction-summary"></ul>
+          </div>
+
+          <div class="result-panel" id="result-panel" data-state="idle" aria-live="polite">
+            <span class="result-panel__icon" id="result-icon" aria-hidden="true">
+              <i data-lucide="circle-dot"></i>
+            </span>
+            <div>
+              <strong id="result-title">Pronto para começar</strong>
+              <p id="result-detail">Selecione uma nota para liberar a correção.</p>
+              <ul id="result-counts" hidden></ul>
+            </div>
+          </div>
+
+          <button class="secondary-button" id="download-again" type="button" hidden>
+            <i data-lucide="download" aria-hidden="true"></i>
+            Baixar novamente
+          </button>
+
+          <div class="privacy-note">
+            <i data-lucide="shield-check" aria-hidden="true"></i>
+            <p>
+              O processamento acontece somente no navegador. Nenhum conteúdo da nota é
+              enviado ou armazenado.
+            </p>
+          </div>
+        </aside>
+      </div>
+    </main>
+
+    <footer class="app-footer">
+      <span>Corretor de XML NF-e</span>
+      <a href="https://github.com/educsj" target="_blank" rel="noreferrer">
+        github.com/educsj
+        <i data-lucide="external-link" aria-hidden="true"></i>
+      </a>
+    </footer>
+
+    <dialog class="help-dialog" id="help-dialog">
+      <div class="dialog-header">
+        <div>
+          <span class="dialog-eyebrow">Manual integrado</span>
+          <h2>Como usar o Corretor de XML</h2>
+        </div>
+        <button
+          class="icon-button icon-button--subtle"
+          id="close-help"
+          type="button"
+          aria-label="Fechar manual"
+          title="Fechar manual"
+        >
+          <i data-lucide="x" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="dialog-content">
+        <section>
+          <h3>Passo a passo</h3>
+          <ol>
+            <li>Selecione ou arraste o XML da nota.</li>
+            <li>Escolha o erro do ERP.</li>
+            <li>Confira as opções de EAN e cProd.</li>
+            <li>Clique em <strong>Corrigir e baixar XML</strong>.</li>
+            <li>Importe no ERP o arquivo terminado em <code>_corrigido.xml</code>.</li>
+          </ol>
+        </section>
+        <section>
+          <h3>Quando usar cada opção</h3>
+          <dl>
+            <dt>Trocar &lt;cEAN&gt; para SEM GTIN</dt>
+            <dd>Quando o EAN do fornecedor vincula o item ao produto errado.</dd>
+            <dt>Trocar também &lt;cEANTrib&gt;</dt>
+            <dd>Quando o ERP também estiver validando o EAN tributável.</dd>
+            <dt>cProd em sequência</dt>
+            <dd>Para caracteres ou formatos que causam SequelizeUniqueConstraintError.</dd>
+            <dt>cProd aleatório</dt>
+            <dd>
+              Quando códigos sequenciais podem coincidir com produtos já cadastrados.
+              Use 6 ou 8 dígitos para diminuir ainda mais essa possibilidade.
+            </dd>
+          </dl>
+        </section>
+        <section>
+          <h3>Segurança do arquivo</h3>
+          <p>
+            O XML é processado apenas na memória deste navegador. A cópia baixada mantém
+            a estrutura e a codificação original, alterando somente as tags selecionadas.
+          </p>
+        </section>
+      </div>
+      <div class="dialog-footer">
+        <button class="secondary-button" id="close-help-footer" type="button">Fechar</button>
+      </div>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>
