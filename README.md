@@ -1,6 +1,6 @@
 # Corretor de XML NF-e
 
-Aplicativo Windows para corrigir XMLs de notas fiscais de entrada antes da importacao em sistemas ERP.
+Aplicativo Windows e Linux para corrigir XMLs de notas fiscais de entrada antes da importacao em sistemas ERP.
 
 ## Versao web
 
