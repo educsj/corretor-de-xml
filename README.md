@@ -17,7 +17,9 @@ O programa foi criado para resolver dois problemas comuns:
 - Renumera `<cProd>` em sequencia: `0001`, `0002`, `0003`...
 - Gera numeros aleatorios unicos para `<cProd>`, com no minimo 4 digitos.
 - Permite alterar a quantidade de digitos do `<cProd>`.
+- Inclui um manual de uso dentro do proprio programa.
 - Interface grafica simples para Windows.
+- Pacote executavel para Linux x86_64.
 
 ## Como usar
 
@@ -32,6 +34,40 @@ O programa foi criado para resolver dois problemas comuns:
 O executavel para Windows fica disponivel nas releases do projeto:
 
 <https://github.com/educsj/corretor-de-xml/releases>
+
+Cada release tambem inclui:
+
+- `CorretorXMLNFe-linux-x86_64.tar.gz`: pacote para Linux.
+- `Manual_Corretor_XML_NFe.docx`: manual em Word.
+- `SHA256SUMS.txt`: checksums para conferir os downloads.
+
+## Executar no Linux
+
+Extraia o pacote:
+
+```bash
+tar -xzf CorretorXMLNFe-linux-x86_64.tar.gz
+```
+
+Permita a execucao e abra o programa:
+
+```bash
+chmod +x CorretorXMLNFe-linux-x86_64
+./CorretorXMLNFe-linux-x86_64
+```
+
+O pacote e compilado no Ubuntu 22.04 e destinado a distribuicoes Linux x86_64
+recentes com ambiente grafico.
+
+## Aviso do Windows
+
+O executavel atual ainda nao possui assinatura digital de editor. Por isso,
+o Microsoft Defender SmartScreen pode exibir um aviso de aplicativo nao
+reconhecido, especialmente em uma versao nova. Baixe somente pelas releases
+oficiais e confira o checksum publicado.
+
+Para distribuicao em maior escala, a mitigacao recomendada e assinar todas as
+versoes com a mesma identidade de editor ou publicar pela Microsoft Store.
 
 ## Rodar em modo desenvolvimento
 

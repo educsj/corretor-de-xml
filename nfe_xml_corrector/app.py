@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 import os
+import subprocess
+import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import webbrowser
@@ -11,6 +13,7 @@ from nfe_xml_corrector.core import (
     correct_xml_file,
     default_output_path,
 )
+from nfe_xml_corrector.manual import APP_VERSION, MANUAL_SECTIONS
 
 
 PRESET_CUSTOM = "Personalizado"
@@ -42,6 +45,58 @@ PRESETS = {
 }
 
 
+def folder_open_command(platform: str, folder: Path) -> list[str] | None:
+    if platform == "win32":
+        return None
+    if platform == "darwin":
+        return ["open", str(folder)]
+    return ["xdg-open", str(folder)]
+
+
+class Tooltip:
+    def __init__(self, widget: tk.Widget, text: str) -> None:
+        self.widget = widget
+        self.text = text
+        self.window: tk.Toplevel | None = None
+        self.after_id: str | None = None
+        widget.bind("<Enter>", self._schedule, add="+")
+        widget.bind("<Leave>", self._hide, add="+")
+        widget.bind("<ButtonPress>", self._hide, add="+")
+
+    def _schedule(self, _event: tk.Event) -> None:
+        self._cancel()
+        self.after_id = self.widget.after(450, self._show)
+
+    def _show(self) -> None:
+        if self.window or not self.widget.winfo_exists():
+            return
+        x = self.widget.winfo_rootx() + self.widget.winfo_width() - 8
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 6
+        self.window = tk.Toplevel(self.widget)
+        self.window.wm_overrideredirect(True)
+        self.window.wm_geometry(f"+{x}+{y}")
+        tk.Label(
+            self.window,
+            text=self.text,
+            bg="#111827",
+            fg="#ffffff",
+            padx=8,
+            pady=5,
+            font=("Segoe UI", 9),
+        ).pack()
+
+    def _cancel(self) -> None:
+        if self.after_id:
+            self.widget.after_cancel(self.after_id)
+            self.after_id = None
+
+    def _hide(self, _event: tk.Event | None = None) -> None:
+        self._cancel()
+        if self.window:
+            self.window.destroy()
+            self.window = None
+
+
 class NFeXmlCorrectorApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
@@ -57,6 +112,7 @@ class NFeXmlCorrectorApp:
         self.cprod_mode = tk.StringVar(value=CPROD_NONE)
         self.cprod_digits = tk.IntVar(value=4)
         self.last_output_path: Path | None = None
+        self.help_window: tk.Toplevel | None = None
 
         self._configure_style()
         self._build_layout()
@@ -82,9 +138,21 @@ class NFeXmlCorrectorApp:
         self.root.rowconfigure(0, weight=1)
         main.columnconfigure(0, weight=1)
 
-        ttk.Label(main, text="Corretor de XML NF-e", style="Title.TLabel").grid(
+        header = ttk.Frame(main)
+        header.grid(row=0, column=0, sticky="ew")
+        header.columnconfigure(0, weight=1)
+        ttk.Label(header, text="Corretor de XML NF-e", style="Title.TLabel").grid(
             row=0, column=0, sticky="w"
         )
+        help_button = ttk.Button(
+            header,
+            text="?",
+            width=3,
+            command=self._open_help,
+            takefocus=True,
+        )
+        help_button.grid(row=0, column=1, sticky="e")
+        self.help_tooltip = Tooltip(help_button, "Abrir manual de uso")
         ttk.Label(
             main,
             text="Importe a nota, escolha a correcao e gere uma copia corrigida.",
@@ -281,6 +349,77 @@ class NFeXmlCorrectorApp:
         if filename:
             self.output_path.set(filename)
 
+    def _open_help(self) -> None:
+        if self.help_window and self.help_window.winfo_exists():
+            self.help_window.deiconify()
+            self.help_window.lift()
+            self.help_window.focus_set()
+            return
+
+        window = tk.Toplevel(self.root)
+        self.help_window = window
+        window.title("Manual de uso")
+        window.geometry("760x650")
+        window.minsize(620, 500)
+        window.transient(self.root)
+        window.columnconfigure(0, weight=1)
+        window.rowconfigure(0, weight=1)
+        window.protocol("WM_DELETE_WINDOW", self._close_help)
+
+        container = ttk.Frame(window, padding=18)
+        container.grid(row=0, column=0, sticky="nsew")
+        container.columnconfigure(0, weight=1)
+        container.rowconfigure(2, weight=1)
+
+        ttk.Label(container, text="Como usar o Corretor de XML", style="Title.TLabel").grid(
+            row=0, column=0, columnspan=2, sticky="w"
+        )
+        ttk.Label(
+            container,
+            text=f"Manual integrado - versao {APP_VERSION}",
+            style="Hint.TLabel",
+        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(2, 12))
+
+        manual = tk.Text(
+            container,
+            wrap="word",
+            relief="flat",
+            bg="#ffffff",
+            fg="#111827",
+            padx=16,
+            pady=14,
+            font=("Segoe UI", 10),
+            spacing1=2,
+            spacing3=2,
+        )
+        manual.grid(row=2, column=0, sticky="nsew")
+        scrollbar = ttk.Scrollbar(container, orient="vertical", command=manual.yview)
+        scrollbar.grid(row=2, column=1, sticky="ns")
+        manual.configure(yscrollcommand=scrollbar.set)
+        manual.tag_configure(
+            "section",
+            font=("Segoe UI Semibold", 12),
+            foreground="#1d4f7a",
+            spacing1=10,
+            spacing3=5,
+        )
+        manual.tag_configure("body", lmargin1=2, lmargin2=2, spacing3=4)
+
+        for heading, body in MANUAL_SECTIONS:
+            manual.insert(tk.END, heading + "\n", "section")
+            manual.insert(tk.END, body + "\n\n", "body")
+        manual.configure(state="disabled")
+
+        ttk.Button(container, text="Fechar", command=self._close_help).grid(
+            row=3, column=0, columnspan=2, sticky="e", pady=(12, 0)
+        )
+        window.focus_set()
+
+    def _close_help(self) -> None:
+        if self.help_window and self.help_window.winfo_exists():
+            self.help_window.destroy()
+        self.help_window = None
+
     def _process(self) -> None:
         try:
             input_file = Path(self.input_path.get())
@@ -346,7 +485,15 @@ class NFeXmlCorrectorApp:
 
     def _try_open_folder(self, folder: Path) -> bool:
         try:
-            os.startfile(str(folder))  # type: ignore[attr-defined]
+            command = folder_open_command(sys.platform, folder)
+            if command is None:
+                os.startfile(str(folder))  # type: ignore[attr-defined]
+            else:
+                subprocess.Popen(
+                    command,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
         except OSError:
             return False
         return True
